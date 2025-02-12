@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scraper from images</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 50px;
+        }
+        .image-container img {
+            width: 100%;
+            max-height: 300px;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Scraper from images</h1>
+        <form id="scraperForm">
+            <div class="mb-3">
+                <label for="url" class="form-label">PUT URL:</label>
+                <input type="url" class="form-control" id="url" placeholder="https://example.com" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Get Images</button>
+        </form>
+
+        <div class="row mt-5" id="imagesContainer"></div>
+
+        <div class="text-center mt-4">
+            <button id="downloadAll" class="btn btn-danger d-none">Download All</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('scraperForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const url = document.getElementById('url').value;
+
+            console.log("URL provided: " + url);
+
+            try {
+                const response = await fetch('http://localhost:4000/scrape', { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch images');
+                }
+
+                const data = await response.json();
+                const container = document.getElementById('imagesContainer');
+                const downloadAllBtn = document.getElementById('downloadAll');
+                container.innerHTML = '';
+
+                if (data.images && data.images.length > 0) {
+                    data.images.forEach(imgSrc => {
+                        const col = document.createElement('div');
+                        col.className = 'col-md-4 mb-3';
+                        col.innerHTML = `
+                            <div class="card">
+                                <img src="${imgSrc}" class="card-img-top" alt="Imagen">
+                                <div class="card-body text-center">
+                                    <button class="btn btn-success" onclick="downloadImage('${imgSrc}')">Download</button>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(col);
+                    });
+
+                    downloadAllBtn.classList.remove('d-none');
+                    downloadAllBtn.onclick = () => downloadAllImages(data.images);
+                } else {
+                    container.innerHTML = '<p class="text-center text-danger">No images found.</p>';
+                    downloadAllBtn.classList.add('d-none');
+                }
+            } catch (error) {
+                console.error("Error fetching images:", error);
+                alert("Error fetching images. Check console for details.");
+            }
+        });
+
+        async function downloadImage(imgUrl) {
+            try {
+                const response = await fetch(imgUrl);
+                const blob = await response.blob();
+                const contentType = response.headers.get("content-type");
+
+                const extension = getExtensionFromMime(contentType) || "png"; 
+                const filename = `${generateFilename()}.${extension}`;
+
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch (error) {
+                console.error("Error downloading image:", error);
+            }
+        }
+
+        async function downloadAllImages(imageUrls) {
+            const zip = new JSZip();
+            const folder = zip.folder("images");
+
+            for (let imgUrl of imageUrls) {
+                try {
+                    const response = await fetch(imgUrl);
+                    const blob = await response.blob();
+                    const contentType = response.headers.get("content-type");
+
+                    const extension = getExtensionFromMime(contentType) || "png";
+                    const filename = `${generateFilename()}.${extension}`;
+
+                    folder.file(filename, blob);
+                } catch (error) {
+                    console.error("Error downloading image:", imgUrl, error);
+                }
+            }
+
+            zip.generateAsync({ type: "blob" }).then(function(content) {
+                saveAs(content, "images.zip");
+            });
+        }
+
+        function getExtensionFromMime(mimeType) {
+            const mimeToExt = {
+                "image/jpeg": "jpg",
+                "image/png": "png",
+                "image/gif": "gif",
+                "image/webp": "webp",
+                "image/svg+xml": "svg",
+                "image/bmp": "bmp",
+                "image/tiff": "tiff",
+                "image/x-icon": "ico"
+            };
+            return mimeToExt[mimeType] || null;
+        }
+
+        function generateFilename() {
+            return "image_" + Math.random().toString(36).substring(7);
+        }
+    </script>
+</body>
+</html>
