@@ -1,1 +1,8 @@
+For run all this, 
+first need to install any libraries to use NODE.JS 
 
+
+1- npm init -y (check if npm is installed) 
+2- npm install express puppeteer cors (this library is skiping a cors policy)
+3- goe to folder that is your project and rund next comand to run node server API -----> node server.js (server.js can be modified if you change the name of the file)
+4- run index.html and enjoy
